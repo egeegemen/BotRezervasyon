@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
 import time
 
 # Renk sabitleri
@@ -11,6 +12,8 @@ class Colors:
     GREEN = "\033[92m"  # Yeşil
     RED = "\033[91m"    # Kırmızı
     YELLOW = "\033[93m" # Sarı
+    BLUE = "\033[94m"   # Mavi
+    BRIGHT_MAGENTA = "\033[95m"
     RESET = "\033[0m"   # Varsayılan rengi sıfırla
 
 def initialize_driver():
@@ -33,7 +36,6 @@ def login(driver):
     # Giriş butonuna tıklıyoruz
     login_button = driver.find_element(By.ID, "btnGirisYap")
     login_button.click()
-    print(Colors.GREEN + "Giriş Tamamlandı" + Colors.RESET)
 
     # Modal kapatma
     close_modal(driver)
@@ -63,7 +65,7 @@ def select_futbol(driver):
     kiralama_yap_button = driver.find_element(By.ID, "pageContent_ucUrunArama_lbtnKiralikAra")
     kiralama_yap_button.click()
 
-def check_availability(driver, hedef_tarih, hedef_saat):
+def check_availability(driver, hedef_tarih, hedef_saatler):
     # Gün başlıklarını buluyoruz (örneğin: 'Salı, 12 Ekim')
     gunler = driver.find_elements(By.CLASS_NAME, "panel-title")
 
@@ -71,13 +73,12 @@ def check_availability(driver, hedef_tarih, hedef_saat):
     for gun in gunler:
         if hedef_tarih in gun.text:  # İlgili tarihi bulduk
             # handle_availability fonksiyonu true/false döndürsün
-            if handle_availability(gun, hedef_tarih, hedef_saat):
-                print(Colors.GREEN + f"{hedef_tarih} için rezervasyon tamamlandı." + Colors.RESET)
-                return  # Rezervasyon yapıldıysa döngüyü kır
+            if handle_availability(gun, hedef_tarih, hedef_saatler):
+                return True # Rezervasyon yapıldıysa döngüyü kır
 
     print(Colors.RED + f"{hedef_tarih} için rezervasyon yapılacak başka bir tarih bulunamadı." + Colors.RESET)
 
-def handle_availability(gun, hedef_tarih, hedef_saat):
+def handle_availability(gun, hedef_tarih, hedef_saatler):
     # Günü bulduktan sonra, o günün altındaki panel-body div'ini kontrol ediyoruz
     try:
         parent_div = gun.find_element(By.XPATH, "./ancestor::div[@class='panel-heading']/following-sibling::div[@class='panel-body']")
@@ -86,32 +87,50 @@ def handle_availability(gun, hedef_tarih, hedef_saat):
         if len(parent_div.text.strip()) == 0:
             print(Colors.RED + f"{hedef_tarih} boş, rezervasyon yapılacak başka bir tarih bulunamadı." + Colors.RESET)
             return False  # Eğer div boşsa false döndür
-
-        print(Colors.GREEN + f"{hedef_tarih} dolu, saat aralıkları kontrol ediliyor." + Colors.RESET)
+        
+        current_time1 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(Colors.BLUE + f"{current_time1}" + Colors.GREEN+ f"- {hedef_tarih} dolu, saat aralıkları kontrol ediliyor." + Colors.RESET)
 
         # Doluysa, saat aralıklarını kontrol et
         time_slots = parent_div.find_elements(By.CLASS_NAME, "lblStyle")
 
         # Saat aralığına göre rezervasyon butonunu bulup tıklıyoruz
         for slot in time_slots:
-            if slot.text == hedef_saat:  # İlgili saat aralığını bulduk
-                print(Colors.GREEN + f"{hedef_saat} saat aralığı bulundu." + Colors.RESET)
+            if slot.text in hedef_saatler:  # Eğer slot, hedef saatler listesindeki bir aralıkla eşleşiyorsa
+                print(Colors.GREEN + f"{slot.text} saat aralığı bulundu." + Colors.RESET)
                 rezervasyon_button = slot.find_element(By.XPATH, "./following-sibling::a[@title='Rezervasyon']")
+                current_time2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 rezervasyon_button.click()  # Rezervasyon butonuna tıklıyoruz
-                print(Colors.GREEN + "Rezervasyon yapıldı." + Colors.RESET)
+                print(Colors.BLUE + f"{current_time2}" +  Colors.GREEN + f"-Rezervasyona Tiklanildi. " + Colors.RESET)
                 return True  # Rezervasyon yapıldıysa true döndür
 
-        print(Colors.RED + f"{hedef_saat} saat aralığı bulunamadı." + Colors.RESET)
+        print(Colors.RED + f"{hedef_saatler} saat aralığı bulunamadı." + Colors.RESET)
         return False  # Saat aralığı bulunamadıysa false döndür
 
     except Exception as e:
         print(Colors.RED + f"{hedef_tarih} için bir hata oluştu: {e}" + Colors.RESET)
         return False  # Hata oluşursa false döndür
 
+def continuously_check_availability(driver, hedef_tarih, hedef_saatler, check_interval=1):
+    print(Colors.YELLOW + f"Rezervasyonlar kontrol ediliyor... Her {check_interval} saniyede bir kontrol yapılacak." + Colors.RESET)
+    
+    while True:
+        # Rezervasyonları kontrol et
+        rezervasyon_yapildi = check_availability(driver, hedef_tarih, hedef_saatler)
+        
+        if rezervasyon_yapildi:
+            print(Colors.GREEN + f"{hedef_tarih} için rezervasyondan sonra CAPTCHA'ya gecildi." + Colors.RESET)
+            break  # Eğer rezervasyon başarılı olursa döngüyü kır ve durdur
+        
+        # Rezervasyonlar henüz yoksa belirli bir süre bekle ve tekrar dene
+        print(Colors.YELLOW + f"{check_interval} saniye sonra tekrar denenecek..." + Colors.RESET)
+        driver.refresh()
+        time.sleep(check_interval)  # Belirtilen saniye kadar bekle
+
 def handle_alert(driver):
     try:
         alert = driver.switch_to.alert
-        print(Colors.YELLOW + alert.text + Colors.RESET)  # Uyarı mesajını görmek isterseniz
+        print(Colors.BRIGHT_MAGENTA + alert.text + Colors.RESET)  # Uyarı mesajını görmek isterseniz
         alert.accept()  # "Tamam" butonuna basmak için accept() kullanıyoruz
         print(Colors.GREEN + "Uyarı mesajı kabul edildi." + Colors.RESET)
     except:
@@ -125,7 +144,7 @@ def handle_captcha(driver):
         captcha_image = WebDriverWait(driver, 3).until(
             EC.presence_of_element_located((By.ID, "pageContent_captchaImage"))
         )
-        print(Colors.YELLOW + "Lütfen CAPTCHA kodunu girin ve devam edin." + Colors.RESET)
+        print(Colors.YELLOW + "Lütfen CAPTCHA kodunu girin ve bu islem son bulsun" + Colors.RESET)
         
         # Kullanıcıdan CAPTCHA kodunu girmesini isteyin
         captcha_input = input("CAPTCHA kodunu girin: ")
@@ -147,13 +166,16 @@ def handle_captcha(driver):
 def main():
     driver = initialize_driver()
     login(driver)
+    print(Colors.GREEN + "Giriş Tamamlandı" + Colors.RESET)
     select_futbol(driver)
+    print(Colors.GREEN + "Halisaha Secildi" + Colors.RESET)
 
     # Hedef tarih ve saat aralığını buradan ayarlıyoruz
-    hedef_tarih = "15.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
-    hedef_saat = "13:00 - 14:00"  # Aranan saat aralığı
+    hedef_tarih = "19.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
+    hedef_saatler = ["12:00 - 13:00", "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"] # Aranan saat aralığı
 
-    check_availability(driver, hedef_tarih, hedef_saat)
+    # Rezervasyonları sürekli kontrol eden fonksiyonu çağırıyoruz
+    continuously_check_availability(driver, hedef_tarih, hedef_saatler)
 
     # Önce alerti kontrol et, ardından CAPTCHA'yı çöz
     handle_alert(driver)
