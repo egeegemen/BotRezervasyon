@@ -76,8 +76,6 @@ def check_availability(driver, hedef_tarih, hedef_saatler):
             if handle_availability(gun, hedef_tarih, hedef_saatler):
                 return True # Rezervasyon yapıldıysa döngüyü kır
 
-    print(Colors.RED + f"{hedef_tarih} için rezervasyon yapılacak başka bir tarih bulunamadı." + Colors.RESET)
-
 def handle_availability(gun, hedef_tarih, hedef_saatler):
     # Günü bulduktan sonra, o günün altındaki panel-body div'ini kontrol ediyoruz
     try:
@@ -98,11 +96,18 @@ def handle_availability(gun, hedef_tarih, hedef_saatler):
         for slot in time_slots:
             if slot.text in hedef_saatler:  # Eğer slot, hedef saatler listesindeki bir aralıkla eşleşiyorsa
                 print(Colors.GREEN + f"{slot.text} saat aralığı bulundu." + Colors.RESET)
-                rezervasyon_button = slot.find_element(By.XPATH, "./following-sibling::a[@title='Rezervasyon']")
-                current_time2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                rezervasyon_button.click()  # Rezervasyon butonuna tıklıyoruz
-                print(Colors.BLUE + f"{current_time2}" +  Colors.GREEN + f"-Rezervasyona Tiklanildi. " + Colors.RESET)
-                return True  # Rezervasyon yapıldıysa true döndür
+                try:
+                    # Rezervasyon butonunu bulmaya çalışıyoruz
+                    rezervasyon_button = slot.find_element(By.XPATH, "./following-sibling::a[@title='Rezervasyon']")
+                    current_time2 = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    rezervasyon_button.click()  # Rezervasyon butonuna tıklıyoruz
+                    print(Colors.BLUE + f"{current_time2}" + Colors.GREEN + f"- Rezervasyona Tıklandı." + Colors.RESET)
+                    return True  # Rezervasyon yapıldıysa true döndür
+                except Exception as e:
+                    # Eğer buton bulunamazsa, hata mesajı bas ve bir sonraki slot'a geç
+                    print(Colors.YELLOW + f"{slot.text} saat aralığı dolu olabilir, sıradaki saat aralığına geçiliyor." + Colors.RESET)
+                    continue  # Bir sonraki saat aralığına geç
+
 
         print(Colors.RED + f"{hedef_saatler} saat aralığı bulunamadı." + Colors.RESET)
         return False  # Saat aralığı bulunamadıysa false döndür
@@ -171,8 +176,9 @@ def main():
     print(Colors.GREEN + "Halisaha Secildi" + Colors.RESET)
 
     # Hedef tarih ve saat aralığını buradan ayarlıyoruz
-    hedef_tarih = "19.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
-    hedef_saatler = ["12:00 - 13:00", "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00"] # Aranan saat aralığı
+    hedef_tarih = "17.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
+    hedef_saatler = ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00"]  # Aranan saat aralıkları
+
 
     # Rezervasyonları sürekli kontrol eden fonksiyonu çağırıyoruz
     continuously_check_availability(driver, hedef_tarih, hedef_saatler)
