@@ -14,6 +14,7 @@ class Colors:
     YELLOW = "\033[93m" # Sarı
     BLUE = "\033[94m"   # Mavi
     BRIGHT_MAGENTA = "\033[95m"
+    BRIGHT_CYAN = "\033[96m" # Parlak Cam Göbeği
     RESET = "\033[0m"   # Varsayılan rengi sıfırla
 
 def initialize_driver():
@@ -122,7 +123,7 @@ def continuously_check_availability(driver, hedef_tarih, hedef_saatler, check_in
     while True:
         # Rezervasyonları kontrol et
         rezervasyon_yapildi = check_availability(driver, hedef_tarih, hedef_saatler)
-        
+
         if rezervasyon_yapildi:
             print(Colors.GREEN + f"{hedef_tarih} için rezervasyondan sonra CAPTCHA'ya gecildi." + Colors.RESET)
             break  # Eğer rezervasyon başarılı olursa döngüyü kır ve durdur
@@ -141,10 +142,10 @@ def handle_alert(driver):
     except:
         print(Colors.RED + "Alert bulunamadı." + Colors.RESET)
 
-def handle_captcha(driver):
+def handle_captcha(driver, hedef_tarih, hedef_saatler):
     # CAPTCHA alanını bulmak için uygun bir seçim yapın
     try:
-
+    
         # CAPTCHA görüntüsünü bekliyoruz
         captcha_image = WebDriverWait(driver, 3).until(
             EC.presence_of_element_located((By.ID, "pageContent_captchaImage"))
@@ -152,17 +153,30 @@ def handle_captcha(driver):
         print(Colors.YELLOW + "Lütfen CAPTCHA kodunu girin ve bu islem son bulsun" + Colors.RESET)
         
         # Kullanıcıdan CAPTCHA kodunu girmesini isteyin
-        captcha_input = input("CAPTCHA kodunu girin: ")
+        captcha_input = input(Colors.BRIGHT_CYAN + "CAPTCHA kodunu girin: " + Colors.RESET)
 
         # CAPTCHA kodunu girmek için uygun alanı bul
         captcha_field = driver.find_element(By.ID, "pageContent_txtCaptchaText")
         captcha_field.send_keys(captcha_input)
 
         # "Sepete Ekle" butonuna tıklayın
-        add_to_cart_button = driver.find_element(By.ID, "pageContent_lbtnSepeteEkle")  # Butonun ID'sini güncelleyin
+        add_to_cart_button = driver.find_element(By.ID, "pageContent_lbtnSepeteEkle")
         add_to_cart_button.click()
+        time.sleep(1)
 
-        print(Colors.GREEN + "Sepete Eklendi." + Colors.RESET)
+        elements = driver.find_elements(By.ID, "pageContent_btnOdemeYap")
+    
+        if len(elements) == 0:
+            # Eğer element yoksa (boş liste dönerse)
+            print(Colors.RED + "Ödeme yap butonu bulunamadı, sayfa yenileniyor..." + Colors.RESET)
+            driver.refresh()  # Sayfayı yenile
+            
+            # continuously_check_availability fonksiyonunu yeniden çağır
+            continuously_check_availability(driver, hedef_tarih, hedef_saatler)
+        else:
+            # Eğer element varsa
+            print(Colors.GREEN + "Ödeme yap butonu bulundu." + Colors.RESET)
+            print(Colors.GREEN + "Sepete Eklendi." + Colors.RESET)
 
     except Exception as e:
         print(Colors.RED + f"CAPTCHA ile ilgili bir hata oluştu: {e}" + Colors.RESET)
@@ -176,8 +190,8 @@ def main():
     print(Colors.GREEN + "Halisaha Secildi" + Colors.RESET)
 
     # Hedef tarih ve saat aralığını buradan ayarlıyoruz
-    hedef_tarih = "17.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
-    hedef_saatler = ["07:00 - 08:00", "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00"]  # Aranan saat aralıkları
+    hedef_tarih = "20.10.2024"  # Hedef tarih (örneğin: "12 Ekim")
+    hedef_saatler = ["07:00 - 08:00", "21:00 - 22:00", "22:00 - 23:00"]  # Aranan saat aralıkları
 
 
     # Rezervasyonları sürekli kontrol eden fonksiyonu çağırıyoruz
@@ -185,7 +199,7 @@ def main():
 
     # Önce alerti kontrol et, ardından CAPTCHA'yı çöz
     handle_alert(driver)
-    handle_captcha(driver)  # CAPTCHA kontrolü buraya ekleniyor
+    handle_captcha(driver, hedef_tarih, hedef_saatler)  # CAPTCHA kontrolü buraya ekleniyor
 
     time.sleep(100)
     driver.quit()
